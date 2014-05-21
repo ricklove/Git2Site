@@ -27,22 +27,86 @@ public class Publish : IHttpHandler
 
         Context.Response.ContentType = "text/plain";
 
-        var zipUrl = "https://github.com/ricklove/CommonCoreMathProblems/archive/master.zip";
+        var list = GetPublishList();
+        foreach (var p in list)
+        {
+            var zipUrl = p.GitHubUrl;
 
-        var zipFilePath = Server.MapPath("~/Temp/Zip/" + "test.zip");
-        var zipFile = new FileInfo(zipFilePath);
-        var unzipDirPath = Server.MapPath("~/Temp/Unzip/" + "test/");
-        var unzipDir = new DirectoryInfo(unzipDirPath);
+            var zipFilePath = Server.MapPath("~/Temp/Zip/" + "temp.zip");
+            var zipFile = new FileInfo(zipFilePath);
+            var unzipDirPath = Server.MapPath("~/Temp/Unzip/" + "temp/");
+            var unzipDir = new DirectoryInfo(unzipDirPath);
 
-        Context.Response.Write("Loading Zip\r\n");
-        Context.Response.Flush();
+            // Load Zip
+            Context.Response.Write("Loading Zip\r\n");
+            Context.Response.Flush();
+            //GetGithubZipFile(zipUrl, zipFile);
+            Context.Response.Write("\r\nDownloaded Zip\r\n");
+            Context.Response.Flush();
 
-        GetGithubZipFile(new Uri(zipUrl), zipFile);
-        Context.Response.Write("\r\nDownloaded Zip\r\n");
-        Context.Response.Flush();
+            // Unzip
+            UnzipFile(zipFile, unzipDir);
+            Context.Response.Write("\r\nUnzipped\r\n");
 
-        UnzipFile(zipFile, unzipDir);
-        Context.Response.Write("\r\nUnzipped\r\n");
+            // Copy to dest path
+            var repoDirName = Directory.GetDirectories(unzipDirPath)[0].TrimEnd('\\');
+            var sourceDirPath = repoDirName + "\\www\\";
+            var destDirPath = Server.MapPath("~/" + p.DestinationRelativePath + "/");
+            
+            
+            var filesToMove = Directory.GetFiles(sourceDirPath, "*.*", SearchOption.AllDirectories);
+
+            foreach (var f in filesToMove)
+            {
+                var relPath = f.Substring(sourceDirPath.Length);
+                var fDest = destDirPath + relPath;
+                var fInfoDest = new FileInfo(fDest);
+
+                if (!fInfoDest.Directory.Exists)
+                {
+                    fInfoDest.Directory.Create();
+                }
+
+                File.Copy(f, fDest, true);
+            }
+
+            Context.Response.Write("\r\nDeployed\r\n");
+        }
+
+    }
+
+    private List<PublishEntry> GetPublishList()
+    {
+        var Context = HttpContext.Current;
+        var Server = HttpContext.Current.Server;
+
+        var listFilePath = Server.MapPath("~/Git2SiteList.txt");
+        var listFile = new FileInfo(listFilePath);
+
+        if (!listFile.Exists)
+        {
+            Context.Response.Write("Git2SiteList.txt is missing");
+            Context.Response.End();
+        }
+
+        var t = File.ReadAllText(listFile.FullName);
+
+        var entries = from l in t
+                      .Replace("\t", " ")
+                          .Replace("    ", " ")
+                          .Replace("   ", " ")
+                          .Replace("  ", " ")
+                          .Replace("  ", " ")
+                          .Split('\n')
+                      let line = l.Trim()
+                      where !line.StartsWith("//")
+                      let parts = line.Split()
+                      where parts.Length == 2
+                      let url = new Uri(parts[0].Trim())
+                      let path = parts[1].Trim(new char[] { '\\', ' ' })
+                      select new PublishEntry() { GitHubUrl = url, DestinationRelativePath = path };
+
+        return entries.ToList();
     }
 
     private void UnzipFile(FileInfo zipFile, DirectoryInfo unzipDir)
@@ -146,5 +210,9 @@ public class Publish : IHttpHandler
     }
 
 
-
+    class PublishEntry
+    {
+        public Uri GitHubUrl { get; set; }
+        public string DestinationRelativePath { get; set; }
+    }
 }
