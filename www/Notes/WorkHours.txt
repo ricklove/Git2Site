@@ -9,5 +9,9 @@
 - Load Repo list
 - Copy www to destination folder on server (overwritng any files)
 
+## 10:00-10:40
+
+- List repos from Git2SiteList.txt
+- Select a repo to publish
 
 # FUTURE

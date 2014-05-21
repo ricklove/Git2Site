@@ -1,4 +1,4 @@
-﻿<%@ WebHandler Language="C#" Class="Publish" %>
+﻿<%@ WebHandler Language="C#" Class="Get2Site" %>
 
 using System;
 using System.Web;
@@ -9,7 +9,8 @@ using System.IO;
 
 using ICSharpCode.SharpZipLib.Zip;
 
-public class Publish : IHttpHandler
+public class Get2Site : IHttpHandler
+    
 {
 
     public bool IsReusable
@@ -22,57 +23,114 @@ public class Publish : IHttpHandler
 
     public void ProcessRequest(HttpContext context)
     {
+        //context.Response.ContentType = "text/html;charset=UTF-8";
+        context.Response.ContentType = "text/plain";
+
+        var qs = context.Request.QueryString;
+        var keys = qs.AllKeys;
+
+        if (keys.Contains("publish"))
+        {
+            var v = qs["publish"];
+            var pIndex = 0;
+            if (int.TryParse(v, out pIndex))
+            {
+                PublishSingleRepo(pIndex);
+            }
+            else
+            {
+                PublishAll();
+            }
+        }
+        else
+        {
+            ListRepos();
+        }
+    }
+
+    public void ListRepos()
+    {
         var Context = HttpContext.Current;
-        var Server = HttpContext.Current.Server;
 
-        Context.Response.ContentType = "text/plain";
+        var list = GetPublishList();
 
+        var t = list.Select((p, index) => new { p = p, index = index }).Aggregate(new System.Text.StringBuilder(),
+            (s, p) => s.AppendLine(p.index + "    " + p.p.GitHubUrl.ToString() + "    " + p.p.DestinationRelativePath));
+
+        Context.Response.Write(t.ToString());
+        Context.Response.End();
+    }
+
+    public void PublishSingleRepo(int pIndex)
+    {
+        var list = GetPublishList();
+        var p = list[pIndex];
+        PublishRepo(p);
+    }
+
+
+    public void PublishAll()
+    {
         var list = GetPublishList();
         foreach (var p in list)
         {
-            var zipUrl = p.GitHubUrl;
+            PublishRepo(p);
+        }
+    }
 
-            var zipFilePath = Server.MapPath("~/Temp/Zip/" + "temp.zip");
-            var zipFile = new FileInfo(zipFilePath);
-            var unzipDirPath = Server.MapPath("~/Temp/Unzip/" + "temp/");
-            var unzipDir = new DirectoryInfo(unzipDirPath);
+    private void PublishRepo(PublishEntry p)
+    {
+        var Context = HttpContext.Current;
+        var Server = HttpContext.Current.Server;
 
-            // Load Zip
-            Context.Response.Write("Loading Zip\r\n");
-            Context.Response.Flush();
-            //GetGithubZipFile(zipUrl, zipFile);
-            Context.Response.Write("\r\nDownloaded Zip\r\n");
-            Context.Response.Flush();
+        var zipUrl = p.GitHubUrl;
 
-            // Unzip
-            UnzipFile(zipFile, unzipDir);
-            Context.Response.Write("\r\nUnzipped\r\n");
+        var tempName = "temp" + DateTime.Now.Ticks;
+        
+        var zipFilePath = Server.MapPath("~/Temp/Zip/" + tempName + ".zip");
+        var zipFile = new FileInfo(zipFilePath);
+        var unzipDirPath = Server.MapPath("~/Temp/Unzip/" + tempName  + "/");
+        var unzipDir = new DirectoryInfo(unzipDirPath);
+       
+        // Load Zip
+        Context.Response.Write("Loading Zip\r\n");
+        Context.Response.Flush();
+        GetGithubZipFile(zipUrl, zipFile);
+        Context.Response.Write("\r\nDownloaded Zip\r\n");
+        Context.Response.Flush();
 
-            // Copy to dest path
-            var repoDirName = Directory.GetDirectories(unzipDirPath)[0].TrimEnd('\\');
-            var sourceDirPath = repoDirName + "\\www\\";
-            var destDirPath = Server.MapPath("~/" + p.DestinationRelativePath + "/");
-            
-            
-            var filesToMove = Directory.GetFiles(sourceDirPath, "*.*", SearchOption.AllDirectories);
+        // Unzip
+        UnzipFile(zipFile, unzipDir);
+        Context.Response.Write("\r\nUnzipped\r\n");
 
-            foreach (var f in filesToMove)
+        // Copy to dest path
+        var repoDirName = Directory.GetDirectories(unzipDirPath)[0].TrimEnd('\\');
+        var sourceDirPath = repoDirName + "\\www\\";
+        var destDirPath = Server.MapPath("~/" + p.DestinationRelativePath + "/");
+
+
+        var filesToMove = Directory.GetFiles(sourceDirPath, "*.*", SearchOption.AllDirectories);
+
+        foreach (var f in filesToMove)
+        {
+            var relPath = f.Substring(sourceDirPath.Length);
+            var fDest = destDirPath + relPath;
+            var fInfoDest = new FileInfo(fDest);
+
+            if (!fInfoDest.Directory.Exists)
             {
-                var relPath = f.Substring(sourceDirPath.Length);
-                var fDest = destDirPath + relPath;
-                var fInfoDest = new FileInfo(fDest);
-
-                if (!fInfoDest.Directory.Exists)
-                {
-                    fInfoDest.Directory.Create();
-                }
-
-                File.Copy(f, fDest, true);
+                fInfoDest.Directory.Create();
             }
 
-            Context.Response.Write("\r\nDeployed\r\n");
+            File.Copy(f, fDest, true);
         }
 
+        // Cleanup
+        zipFile.Delete();
+        unzipDir.Delete(true);
+
+        Context.Response.Write("\r\nDeployed\r\n");
+        Context.Response.Write("\r\n--------\r\n\r\n\r\n");
     }
 
     private List<PublishEntry> GetPublishList()

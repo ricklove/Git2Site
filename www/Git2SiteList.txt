@@ -1,3 +1,4 @@
 ﻿// Example List
 
 https://github.com/ricklove/CommonCoreMathProblems/archive/master.zip	Temp/Apps/CommonCoreMathProblems
+https://github.com/ricklove/SpiderMath/archive/master.zip	Temp/Apps/SpiderMath
