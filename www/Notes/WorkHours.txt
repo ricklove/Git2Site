@@ -1,9 +1,11 @@
 # 2014-05-21
-## 6:00-
+## 6:00-7:25
+
+- Download repo from github and unzip on server
+
 
 # FUTURE
 
-- Get List of files from github
 - Scan local directory to find file changes
 - Copy files from github to local directory
 
