@@ -122,7 +122,15 @@ public class Get2Site : IHttpHandler
                 fInfoDest.Directory.Create();
             }
 
-            File.Copy(f, fDest, true);
+            var fInfo = new FileInfo(f);
+
+            if (!fInfoDest.Exists
+                // Ignore time because it always changes
+                //|| fInfo.LastWriteTimeUtc != fInfoDest.LastWriteTimeUtc
+                || fInfo.Length != fInfoDest.Length)
+            {
+                File.Copy(f, fDest, true);
+            }
         }
 
         // Cleanup

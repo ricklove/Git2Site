@@ -14,4 +14,8 @@
 - List repos from Git2SiteList.txt
 - Select a repo to publish
 
+## 12:35-12:50
+
+- Only change if size or date modified different to avoid causing browsers to redownload everything
+
 # FUTURE
